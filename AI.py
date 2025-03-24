@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
@@ -14,7 +15,7 @@ class NeuralNetwork:
         self.alpha = alpha
         self.W = []
         self.b = []
-    
+        
         for i in range(len(layers) - 1):
             self.W.append(np.random.randn(layers[i], layers[i+1]) / np.sqrt(layers[i]))
             self.b.append(np.zeros((layers[i+1], 1)))
@@ -63,43 +64,53 @@ class NeuralNetwork:
         y = y.reshape(-1, 1)
         loss = -np.mean(y * np.log(y_predict + 1e-12) + (1 - y) * np.log(1 - y_predict + 1e-12))
         return loss
-
-def main():  
-    df = pd.read_csv('WA_Fn-UseC_-HR-Employee-Attrition.csv')  
-
-    df = df.sample(n=20, random_state=42)  
- 
-    X = df.drop('Attrition', axis=1)  
-    y = df['Attrition'].map({'Yes': 1, 'No': 0}).values 
- 
-    X = pd.get_dummies(X, drop_first=True)  
-
-    scaler = MinMaxScaler()  
-    X_scaled = scaler.fit_transform(X)  
-
-    p = NeuralNetwork([X.shape[1], 10, 1], alpha=0.05)  
-    p.fit(X_scaled, y, epochs=20000, verbose=100)  
- 
-    tuoi = float(input("Nhập tuổi: "))  
-    kinh_nghiem = float(input("Nhập số năm kinh nghiệm: "))  
-    trinh_do_hoc_van = input("Nhập trình độ học vấn (Cao đẳng, Đại học, Sau đại học): ")  
-    nganh_nghe = input("Nhập ngành nghề (CNTT, Kinh doanh, Khoa học): ")  
-    bang_cap = input("Nhập loại bằng cấp (Khá, Giỏi, Trung bình, Xuất sắc): ")  
-
-    input_data = pd.DataFrame([[tuoi, kinh_nghiem, trinh_do_hoc_van, nganh_nghe, bang_cap]],  
-                              columns=['tuoi', 'kinh_nghiem', 'trinh_do_hoc_van', 'nganh_nghe', 'bang_cap'])  
-
-    input_data = pd.get_dummies(input_data, columns=['trinh_do_hoc_van', 'nganh_nghe', 'bang_cap'])  
-
-    for column in X.columns:  
-        if column not in input_data.columns:  
-            input_data[column] = 0  
     
-    input_data = input_data[X.columns]  
-    input_scaled = scaler.transform(input_data)  
+def main():
+    df = pd.read_csv('WA_Fn-UseC_-HR-Employee-Attrition.csv')
 
-    xac_suat_that_nghiep = p.predict(input_scaled)  
-    print(f'Xác suất thất nghiệp: {xac_suat_that_nghiep[0][0] * 100:.2f}%')  
+    features = ['Age', 'TotalWorkingYears', 'Education', 'JobRole']
+    df = df[features + ['Attrition']]
 
-if __name__ == "__main__":  
-    main()  
+    df['Attrition'] = df['Attrition'].map({'Yes': 1, 'No': 0})
+
+    df = pd.get_dummies(df, columns=['JobRole'], drop_first=True)
+
+    X = df.drop(columns=['Attrition'])
+    y = df['Attrition'].values
+
+    scaler = MinMaxScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+    model = NeuralNetwork([X.shape[1], 10, 1], alpha=0.05)
+    model.fit(X_train, y_train, epochs=20000, verbose=1000)
+
+    tuoi = float(input("Nhập tuổi: "))
+    kinh_nghiem = float(input("Nhập số năm kinh nghiệm: "))
+    trinh_do_hoc_van = int(input("Nhập trình độ học vấn (1: Trung học, 2: Cao đẳng, 3: Đại học, 4: Sau đại học, 5: Tiến sĩ): "))
+    nganh_nghe = input("Nhập ngành nghề (Sales, Research Scientist, Laboratory Technician, Manager, Healthcare Representative, Human Resources, Technical Degree, Manufacturing Director, Research Director): ")
+
+    input_data = pd.DataFrame([[tuoi, kinh_nghiem, trinh_do_hoc_van, nganh_nghe]],
+                              columns=['Age', 'TotalWorkingYears', 'Education', 'JobRole'])
+
+    input_data = pd.get_dummies(input_data, columns=['JobRole'])
+
+    for column in X.columns:
+        if column not in input_data.columns:
+            input_data[column] = 0
+    
+    input_data = input_data[X.columns]
+
+    input_scaled = scaler.transform(input_data)
+
+    ket_qua = model.predict(input_scaled)
+
+    print(f' Xác suất thất nghiệp: {ket_qua[0][0] * 100:.2f}%')
+    if ket_qua[0][0] > 0.5:
+        print(' Có khả năng thất nghiệp')   
+    else:   
+        print(' Không có khả năng thất nghiệp')
+
+if __name__ == "__main__":
+    main()
